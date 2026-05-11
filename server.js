@@ -1,14 +1,10 @@
-﻿// server.js - Version corrigée par H@B
+// server.js - Version Optimisée pour Railway (H@B)
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 
-// Configuration Socket.io
 const io = require('socket.io')(http, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 const path = require('path');
@@ -25,9 +21,10 @@ app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
+// MODIFICATION ICI : On utilise un dossier local pour la session
 const client = new Client({
     authStrategy: new LocalAuth({ 
-        dataPath: '/tmp/.wwebjs_auth' 
+        clientId: "hab-relais-session" 
     }),
     puppeteer: {
         headless: true,
@@ -35,7 +32,6 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
             '--single-process',
@@ -47,59 +43,47 @@ const client = new Client({
 // -- GESTION DU QR CODE --
 client.on('qr', (qr) => {
     console.log('--- NOUVEAU QR CODE GÉNÉRÉ ---');
-    qrcode.generate(qr, {small: true}); // Affiche dans le terminal
-    io.emit('qr', qr); // ENVOIE le QR code à l'interface Web (index.html)
+    // Affiche dans les logs Railway (IMPORTANT : regarde bien tes Deploy Logs)
+    qrcode.generate(qr, {small: true}); 
+    // Envoie à ton index.html
+    io.emit('qr', qr); 
 });
 
 client.on('ready', () => {
     console.log('--- LE BOT H@B RELAIS EST PRÊT ! ---');
-    io.emit('ready'); // Informe le web que la connexion est réussie
+    io.emit('ready');
 });
 
+// Gestion des messages
 client.on('message', async (msg) => {
-    const chat = await msg.getChat();
-    
-    // LOG POUR RÉCUPÉRER TON ID DE GROUPE
-    console.log(`Message reçu de : ${chat.name} | ID: ${chat.id._serialized}`);
+    try {
+        const chat = await msg.getChat();
+        console.log(`Message de : ${chat.name} (ID: ${chat.id._serialized})`);
 
-    // Utilisation de .includes pour éviter les erreurs d'espaces dans le nom
-    if (chat.name.includes('CÉLÉBRATION')) { 
-        let messageData = {
-            sender: msg.author || msg.from,
-            type: msg.type,
-            body: msg.body,
-            timestamp: msg.timestamp
-        };
+        if (chat.name.includes('CÉLÉBRATION')) { 
+            let messageData = {
+                sender: msg.author || msg.from,
+                type: msg.type,
+                body: msg.body,
+                timestamp: msg.timestamp
+            };
 
-        if (msg.hasMedia) {
-            const media = await msg.downloadMedia();
-            if (msg.type === 'ptt') {
-                messageData.type = 'ptt';
-                messageData.mediaUrl = `data:${media.mimetype};base64,${media.data}`;
+            if (msg.hasMedia) {
+                const media = await msg.downloadMedia();
+                if (media) {
+                    messageData.mediaUrl = `data:${media.mimetype};base64,${media.data}`;
+                }
             }
+            io.emit('whatsapp_message', messageData);
         }
-        
-        io.emit('whatsapp_message', messageData);
+    } catch (e) {
+        console.error("Erreur message:", e);
     }
 });
 
-io.on('connection', (socket) => {
-    console.log('Interface Web connectée.');
-
-    socket.on('send_to_whatsapp', async (data) => {
-        // REMPLACE CET ID par celui que tu verras dans tes logs (ex: 120363... @g.us)
-        const targetGroupId = 'TON_ID_DE_GROUPE_ICI@g.us'; 
-        
-        try {
-            await client.sendMessage(targetGroupId, data.message);
-        } catch (error) {
-            console.error('Erreur envoi:', error);
-        }
-    });
-});
-
-const PORT = process.env.PORT || 3000;
+// Port Railway dynamique
+const PORT = process.env.PORT || 8080; 
 http.listen(PORT, '0.0.0.0', () => {
     console.log(`Serveur en ligne sur le port ${PORT}`);
-    client.initialize();
+    client.initialize().catch(err => console.error("Erreur Init:", err));
 });
