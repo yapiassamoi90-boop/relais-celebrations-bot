@@ -5,14 +5,12 @@
     "nixpacksPlan": {
       "phases": {
         "setup": {
-          "nixPkgs": ["nodejs", "chromium", "glib"]
+          "nixPkgs": ["nodejs", "chromium", "glib", "libnss3"]
         }
       }
     }
   },
   "deploy": {
-    "startCommand": "node server.js",
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 5
+    "startCommand": "node server.js"
   }
 }
