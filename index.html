@@ -1,0 +1,191 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relais Célébration - H@B</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#075E54">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --wa-green: #075E54;
+            --wa-light-green: #25D366;
+            --bg-chat: #e5ddd5;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            background-color: var(--bg-chat);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: var(--wa-green);
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        header img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+
+        /* Conteneur QR dynamique */
+        #qr-view {
+            display: none;
+            background: white;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid var(--wa-light-green);
+        }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
+
+        .received { background: white; align-self: flex-start; }
+        .sent { background: #dcf8c6; align-self: flex-end; }
+
+        .sender-name {
+            font-weight: bold;
+            font-size: 11px;
+            color: #27ae60;
+            margin-bottom: 3px;
+            display: block;
+        }
+
+        .input-area {
+            background: #f0f0f0;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            outline: none;
+        }
+
+        .btn {
+            background: var(--wa-green);
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .signature { text-align: center; font-size: 10px; color: #777; padding: 5px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+
+<header>
+    <img src="icon-192.png" alt="Logo">
+    <div>
+        <div style="font-weight: bold;">CÉLÉBRATION</div>
+        <div style="font-size: 11px; opacity: 0.8;">Relais Synchronisé H@B</div>
+    </div>
+</header>
+
+<div id="qr-view">
+    <p style="margin:0; font-weight:bold;">Scanner pour connecter WhatsApp</p>
+    <div id="qrcode"></div>
+</div>
+
+<div id="chat-container">
+    <div class="message received">Connexion au serveur...</div>
+</div>
+
+<div class="input-area">
+    <button class="btn">🎤</button>
+    <input type="text" id="msgInput" placeholder="Tapez un message...">
+    <button class="btn" onclick="sendMsg()">➤</button>
+</div>
+
+<div class="signature">Développé par <b>H@B</b></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    const qrView = document.getElementById('qr-view');
+    const qrElement = document.getElementById('qrcode');
+    const chatContainer = document.getElementById('chat-container');
+
+    // Afficher le QR Code reçu du serveur
+    socket.on('qr', (data) => {
+        qrView.style.display = 'block';
+        qrElement.innerHTML = "";
+        new QRCode(qrElement, {
+            text: data,
+            width: 160,
+            height: 160
+        });
+    });
+
+    // Cacher le QR une fois connecté
+    socket.on('ready', () => {
+        qrView.style.display = 'none';
+        chatContainer.innerHTML += '<div class="message received" style="background:#e3f2fd"><b>Système :</b> Connecté !</div>';
+    });
+
+    socket.on('whatsapp_message', (data) => {
+        const div = document.createElement('div');
+        div.className = 'message received';
+        if(data.type === 'chat') {
+            div.innerHTML = `<span class="sender-name">${data.sender}</span>${data.body}`;
+        } else if(data.type === 'ptt') {
+            div.innerHTML = `<span class="sender-name">${data.sender}</span><audio controls src="${data.mediaUrl}"></audio>`;
+        }
+        chatContainer.appendChild(div);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
+
+    function sendMsg() {
+        const inp = document.getElementById('msgInput');
+        if(inp.value.trim() !== "") {
+            socket.emit('send_to_whatsapp', { message: inp.value });
+            const div = document.createElement('div');
+            div.className = 'message sent';
+            div.innerText = inp.value;
+            chatContainer.appendChild(div);
+            inp.value = "";
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+</script>
+</body>
+</html>
