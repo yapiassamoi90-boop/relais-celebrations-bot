@@ -1,4 +1,4 @@
-﻿// Nom du cache (change la version quand tu mets à jour l'HTML/CSS)
+// Nom du cache (change la version quand tu mets à jour l'HTML/CSS)
 const CACHE_NAME = 'hab-relais-celebration-v1';
 
 // Liste des fichiers critiques à mettre en cache immédiatement
